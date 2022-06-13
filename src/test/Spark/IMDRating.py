@@ -60,10 +60,8 @@ for rating in range(10):
         bloom_filter[rating].add(titles_collected[title][0])
     print("Rating: ", rating + 1, ", Added titles: ", len(titles_collected))
 for rating in range(10):
-    titles_collected = titles.filter(lambda x : x[1] != rating + 1).collect()
-    count = 0
-    for title in range(0, len(titles_collected)):
-        if bloom_filter[rating].check(titles_collected[title][0]):
-            count = count + 1
-    print("Rating: ", rating + 1, ", Fp titles: ", count, ", Fpr: ", count / len(titles_collected))
+    titles_filtered = titles.filter(lambda x : x[1] != rating + 1)
+    titles_fp = titles_filtered.filter(lambda x: bloom_filter[rating].check(x[0]) > 0)
+    print("{0:02d} {1:12.10f}".format(rating + 1, titles_fp.count()/titles_filtered.count()))
+
 
