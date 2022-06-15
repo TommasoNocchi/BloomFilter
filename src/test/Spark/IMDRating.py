@@ -48,7 +48,7 @@ class BloomFilter:
         k = (m/n) * math.log(2)
         return java_round(k)
 
-file = sc.textFile("data.tsv")
+file = sc.textFile(sys.argv[2])
 temp = file.map(lambda x: (x.split("\t")))
 titles = temp.map(lambda x: (x[0],java_round(float(x[1]))))
 fpr = float(sys.argv[1])
@@ -56,7 +56,7 @@ bloom_filter = [0 for _ in range(10)]
 for rating in range(10):
     titles_collected = titles.filter(lambda x : x[1] == rating + 1).collect()
     bloom_filter[rating] = BloomFilter(len(titles_collected), fpr)
-    for title in range(0, len(titles_collected)):
+    for title in range(len(titles_collected)):
         bloom_filter[rating].add(titles_collected[title][0])
     print("Rating: ", rating + 1, ", Added titles: ", len(titles_collected))
 for rating in range(10):
