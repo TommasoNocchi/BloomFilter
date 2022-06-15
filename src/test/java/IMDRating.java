@@ -51,40 +51,40 @@ public class IMDRating
         }
     }
 
-    public static class PopulateMapper extends Mapper<Object, Text, Text, Text>
+    public static class BloomMapper extends Mapper<Object, Text, Text, Text>
     {
         private final Text tconst  = new Text();
         private int averageRating = 0;
+        private String[] rowFields;
+        private final Text rating = new Text();
 
         public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
-            final StringTokenizer rowIterator = new StringTokenizer(value.toString(),"\n");
-            String[] rowFields;
-            while(rowIterator.hasMoreTokens()) {
-                rowFields = rowIterator.nextToken().toString().split("\t");
-                if (rowFields.length == 3) {
-                    tconst.set(rowFields[0]);
-                    averageRating = (int) Math.round(Double.parseDouble(rowFields[1]));
-                    if (averageRating >= 1 && averageRating <=10)
-                        context.write(new Text(String.format("%02d",averageRating)), new Text(tconst));
+            rowFields = value.toString().split("\t");
+            if (rowFields.length == 3) {
+                tconst.set(rowFields[0]);
+                averageRating = (int) Math.round(Double.parseDouble(rowFields[1]));
+                if (averageRating >= 1 && averageRating <= 10) {
+                    rating.set(String.format("%02d", averageRating));
+                    context.write(rating, tconst);
                 }
             }
         }
     }
 
-    public static class PopulateReducer extends Reducer<Text, Text, Text, Text> {
+    public static class BloomReducer extends Reducer<Text, Text, Text, Text> {
+        private final Text bloomFilterString  = new Text();
         public void reduce(final Text key, final @NotNull Iterable<Text> values, final Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             BloomFilter bloom_filter;
-            int iter2 = 0;
             double p_falsePositiveRate = conf.getDouble("fpr",0.5);
             int n_itemNumber = conf.getInt(String.valueOf(key),0);
 
             bloom_filter = new BloomFilter(n_itemNumber,p_falsePositiveRate);
             for (final Text val : values) {
-                iter2 += 1;
                 bloom_filter.addItem(val);
             }
-            context.write(key, new Text(bloom_filter.getString()));
+            bloomFilterString.set(bloom_filter.getString());
+            context.write(key, bloomFilterString);
         }
     }
 
@@ -177,12 +177,12 @@ public class IMDRating
             jobConfiguration.setInt(tokens[0], Integer.parseInt(tokens[1]));
         }
 
-        try (Job job = new Job(jobConfiguration, "count")) {
+        try (Job job = new Job(jobConfiguration, "bloom")) {
             job.setJarByClass(BloomFilter.class);
             job.setOutputKeyClass(Text.class);
             job.setOutputValueClass(Text.class);
-            job.setMapperClass(PopulateMapper.class);
-            job.setReducerClass(PopulateReducer.class);
+            job.setMapperClass(BloomMapper.class);
+            job.setReducerClass(BloomReducer.class);
             NLineInputFormat.addInputPath(job, new Path(args[1]));
             NLineInputFormat.setNumLinesPerSplit(job, 100_000);
             FileOutputFormat.setOutputPath(job, new Path(args[3]));
@@ -204,11 +204,3 @@ public class IMDRating
         }
     }
 }
-
-/*{ // DEBUG
-        FileSystem debugfs = FileSystem.get(conf);
-        Path debugpath = new Path("debug/debug.txt");
-        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(debugfs.append(debugpath)))) {
-        bw.write("CHECK MAPPER :" + Integer.toString(n_NumberOfKeys[i]) + " " + Integer.toString(m[i]) + "\n");
-        }
-} // DEBUG*/
