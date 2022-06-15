@@ -96,6 +96,10 @@ public class IMDRating
         private int[] n_itemNumber = new int[10];
         private BloomFilter[] BF = new BloomFilter[10];
 
+        private final IntWritable count = new IntWritable(1);
+        private String[] rowFields;
+        private final Text rating = new Text();
+
         public void setup(Mapper.Context context) throws IOException {
             Configuration conf = context.getConfiguration();
             int i;
@@ -116,10 +120,7 @@ public class IMDRating
         }
 
         public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
-            final StringTokenizer rowIterator = new StringTokenizer(value.toString(),"\n");
-            String[] rowFields;
-            while(rowIterator.hasMoreTokens()) {
-                rowFields = rowIterator.nextToken().toString().split("\t");
+                rowFields = value.toString().split("\t");
                 if (rowFields.length == 3) {
                     tconst.set(rowFields[0]);
                     averageRating = (int) Math.round(Double.parseDouble(rowFields[1]));
@@ -127,15 +128,17 @@ public class IMDRating
                         for(int i = 0; i < 10; i++) {
                             if (i + 1 == averageRating)
                                 continue;
-                            if (BF[i].checkItem(tconst))
-                                context.write(new Text(String.format("%02d", i + 1)), new IntWritable(1));
+                            if (BF[i].checkItem(tconst)) {
+                                rating.set(String.format("%02d", averageRating));
+                                context.write(rating, count);
+                            }
                         }
                 }
-            }
         }
     }
 
     public static class CheckReducer extends Reducer<Text, IntWritable, Text, DoubleWritable> {
+        private final DoubleWritable actualFPR = new DoubleWritable();
         public void reduce(final Text key, final @NotNull Iterable<IntWritable> values, final Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             int sum = 0, count = 0;
@@ -146,7 +149,8 @@ public class IMDRating
                 if(i + 1 != Integer.parseInt(key.toString()))
                     count += conf.getInt(String.format("%02d", i + 1), 0);
 
-            context.write(new Text(key), new DoubleWritable((double)sum / (double)count));
+            actualFPR.set((double)sum / (double)count);
+            context.write(key, actualFPR);
         }
     }
 
