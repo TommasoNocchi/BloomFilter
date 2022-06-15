@@ -129,7 +129,7 @@ public class IMDRating
                             if (i + 1 == averageRating)
                                 continue;
                             if (BF[i].checkItem(tconst)) {
-                                rating.set(String.format("%02d", averageRating));
+                                rating.set(String.format("%02d", i+1));
                                 context.write(rating, count);
                             }
                         }
