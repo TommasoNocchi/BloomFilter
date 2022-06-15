@@ -23,37 +23,31 @@ public class IMDRating
      */
     public static class CountMapper extends Mapper<Object, Text, Text, IntWritable>
     {
-        private final Text tconst  = new Text();
         private int averageRating = 0;
         private final Text rating = new Text();
-        private int[] toWrite = new int[10];
+        private final IntWritable count = new IntWritable(1);
+        private String[] rowFields;
 
         public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
-            final StringTokenizer rowIterator = new StringTokenizer(value.toString(),"\n");
-            String[] rowFields;
-            for(int i = 0; i < toWrite.length; i++)
-                toWrite[i] = 0;
-            while(rowIterator.hasMoreTokens()) {
-                rowFields = rowIterator.nextToken().toString().split("\t");
-                if (rowFields.length == 3) {
-                    tconst.set(rowFields[0]);
-                    averageRating = (int) Math.round(Double.parseDouble(rowFields[1]));
-                    if (averageRating >= 1 && averageRating <=10)
-                        toWrite[averageRating-1]++;
+            rowFields = value.toString().split("\t");
+            if (rowFields.length == 3) {
+                averageRating = (int) Math.round(Double.parseDouble(rowFields[1]));
+                if (averageRating >= 1 && averageRating <=10) {
+                    rating.set(String.format("%02d", averageRating));
+                    context.write(rating, count);
                 }
             }
-            for(int i = 0; i < toWrite.length; i++)
-                context.write(new Text(String.format("%02d",i + 1)), new IntWritable(toWrite[i]));
         }
     }
 
     public static class CountReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+        private final IntWritable Sum = new IntWritable();
         public void reduce(final Text key, final @NotNull Iterable<IntWritable> values, final Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
             int sum = 0;
             for (final IntWritable val : values)
                 sum += val.get();
-            context.write(key, new IntWritable(sum));
+            Sum.set(sum);
+            context.write(key, Sum);
         }
     }
 
